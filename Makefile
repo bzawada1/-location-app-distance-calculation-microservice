@@ -10,7 +10,7 @@ calculator:
 	@go build -o bin/calculator ./distance_calculator
 	@./bin/calculator
 
-aggregator:
+agg:
 	@go build -o bin/aggregator ./aggregator
 	@./bin/aggregator
 
