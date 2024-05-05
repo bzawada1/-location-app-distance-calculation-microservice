@@ -2,6 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"time"
+
+	"github.com/bzawada1/location-app-obu-service/aggregator/client"
 	"github.com/bzawada1/location-app-obu-service/types"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/sirupsen/logrus"
@@ -11,9 +14,10 @@ type KafkaConsumer struct {
 	consumer    *kafka.Consumer
 	isRunning   bool
 	calcService CalculatorServicer
+	aggClient   *client.Client
 }
 
-func NewKafkaConsumer(topic string, svc CalculatorServicer) (*KafkaConsumer, error) {
+func NewKafkaConsumer(topic string, svc CalculatorServicer, aggClient *client.Client) (*KafkaConsumer, error) {
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost",
 		"group.id":          "myGroup",
@@ -27,6 +31,7 @@ func NewKafkaConsumer(topic string, svc CalculatorServicer) (*KafkaConsumer, err
 	return &KafkaConsumer{
 		consumer:    c,
 		calcService: svc,
+		aggClient:   aggClient,
 	}, nil
 }
 
@@ -48,10 +53,21 @@ func (c *KafkaConsumer) readMessageLoop() {
 			logrus.Errorf("JSON serialization error %s", err)
 			continue
 		}
-		_, err = c.calcService.CalculateDistance(data)
+		distance, err := c.calcService.CalculateDistance(data)
 		if err != nil {
 			logrus.Errorf("calculation error %s", err)
 			continue
 		}
+
+		reqData := types.Distance{
+			Value: distance,
+			Unix:  time.Now().UnixNano(),
+			OBUID: data.OBUID,
+		}
+		if err := c.aggClient.AggregateInvoice(reqData); err != nil {
+			logrus.Errorf("aggregate error: ", err)
+			continue
+		}
 	}
+
 }

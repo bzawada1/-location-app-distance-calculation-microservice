@@ -13,7 +13,8 @@ func main() {
 	flag.Parse()
 	store := NewMemoryStore()
 	svc := NewInvoiceAggregator(store)
-	makeHTTPTransport(*listenAddr, svc)
+	logSvc := NewLogMiddleware(svc)
+	makeHTTPTransport(*listenAddr, logSvc)
 }
 
 func makeHTTPTransport(listenAddr string, svc Aggregator) {
