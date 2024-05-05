@@ -8,7 +8,8 @@ const topic = "obudata"
 
 func main() {
 	svc := NewCalculatorService()
-	kafkaConsumer, err := NewKafkaConsumer(topic, svc)
+	logSvc := NewLogMiddleware(svc)
+	kafkaConsumer, err := NewKafkaConsumer(topic, logSvc)
 	if err != nil {
 		log.Fatal(err)
 	}

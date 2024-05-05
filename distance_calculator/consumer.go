@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-
 	"github.com/bzawada1/location-app-obu-service/types"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/sirupsen/logrus"
@@ -50,12 +48,10 @@ func (c *KafkaConsumer) readMessageLoop() {
 			logrus.Errorf("JSON serialization error %s", err)
 			continue
 		}
-		distance, err := c.calcService.CalculateDistance(data)
+		_, err = c.calcService.CalculateDistance(data)
 		if err != nil {
 			logrus.Errorf("calculation error %s", err)
 			continue
 		}
-
-		fmt.Println(distance)
 	}
 }
