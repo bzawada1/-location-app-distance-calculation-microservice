@@ -7,7 +7,7 @@ import (
 
 const (
 	topic              = "obudata"
-	aggregatorEndpoint = "http://127.0.0.1:3000/aggregate"
+	aggregatorEndpoint = "http://127.0.0.1:3000"
 )
 
 func main() {
