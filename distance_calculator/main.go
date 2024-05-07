@@ -13,7 +13,7 @@ const (
 func main() {
 	svc := NewCalculatorService()
 	logSvc := NewLogMiddleware(svc)
-	client := client.NewClient(aggregatorEndpoint)
+	client := client.NewHTTPClient(aggregatorEndpoint)
 	kafkaConsumer, err := NewKafkaConsumer(topic, logSvc, client)
 	if err != nil {
 		log.Fatal(err)

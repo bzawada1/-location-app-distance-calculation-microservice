@@ -29,7 +29,7 @@ func makeGRPCTransport(listenAddr string, svc Aggregator) error {
 	}
 	defer ln.Close()
 	server := grpc.NewServer([]grpc.ServerOption{}...)
-	types.RegisterAggregatorServer(server, NewAggregatorGRPCServer(svc))
+	types.RegisterAggregatorServer(server, NewAggregatorGRPCServer(svc).server)
 	return server.Serve(ln)
 
 }
@@ -37,6 +37,7 @@ func makeGRPCTransport(listenAddr string, svc Aggregator) error {
 func makeHTTPTransport(listenAddr string, svc Aggregator) {
 	http.HandleFunc("/aggregate", handleAggregate(svc))
 	http.HandleFunc("/invoice", handleGetInvoice(svc))
+	http.HandleFunc("/invoice/all", handleGetAllInvoice(svc))
 	http.ListenAndServe(listenAddr, nil)
 }
 
@@ -58,6 +59,13 @@ func handleGetInvoice(svc Aggregator) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, invoice)
+		return
+	}
+}
+
+func handleGetAllInvoice(svc Aggregator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, svc.GetAll())
 		return
 	}
 }

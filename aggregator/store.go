@@ -29,3 +29,7 @@ func (m *MemoryStore) Get(id int) (float64, error) {
 
 	return dist, nil
 }
+
+func (m *MemoryStore) GetAll() map[int]float64 {
+	return m.data
+}

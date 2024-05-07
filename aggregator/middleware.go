@@ -49,3 +49,7 @@ func (l *LogMiddleware) CalculateInvoice(obuID int) (invoice *types.Invoice, err
 	invoice, err = l.next.CalculateInvoice(obuID)
 	return
 }
+
+func (l *LogMiddleware) GetAll() map[int]float64 {
+	return
+}
