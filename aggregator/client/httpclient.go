@@ -50,7 +50,8 @@ func (c *HTTPClient) GetInvoice(ctx context.Context, id int) (*types.Invoice, er
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", c.Endpoint+"/invoice", bytes.NewReader(b))
+	endpoint := fmt.Sprintf("%s/%s?obu=%d", c.Endpoint, "invoice", id)
+	req, err := http.NewRequest("POST", endpoint, bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +60,9 @@ func (c *HTTPClient) GetInvoice(ctx context.Context, id int) (*types.Invoice, er
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("the service responded with non 200 status code %d", resp.StatusCode)
+		var body any
+		json.NewDecoder(resp.Body).Decode(&body)
+		return nil, fmt.Errorf("the service responded with non 200 status code %d", body)
 	}
 	inv := types.Invoice{}
 	if err := json.NewDecoder(resp.Body).Decode(&inv); err != nil {

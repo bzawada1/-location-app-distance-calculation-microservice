@@ -22,7 +22,7 @@ func (l *LogMiddleware) AggregateDistance(distance types.Distance) (err error) {
 		logrus.WithFields(logrus.Fields{
 			"took": time.Since(start),
 			"err":  err,
-		}).Info("Aggregate distance")
+		}).Info("AGGREGATOR: Aggregate distance")
 	}(time.Now())
 	err = l.next.AggregateDistance(distance)
 	return nil
@@ -44,12 +44,12 @@ func (l *LogMiddleware) CalculateInvoice(obuID int) (invoice *types.Invoice, err
 			"obuID":    obuID,
 			"distance": distance,
 			"amount":   amount,
-		}).Info("Calculate the invoice")
+		}).Info("AGGREGATOR: Calculate the invoice")
 	}(time.Now())
 	invoice, err = l.next.CalculateInvoice(obuID)
 	return
 }
 
 func (l *LogMiddleware) GetAll() map[int]float64 {
-	return
+	return map[int]float64{}
 }

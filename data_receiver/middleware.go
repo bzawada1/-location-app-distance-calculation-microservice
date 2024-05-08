@@ -24,7 +24,7 @@ func (l *LogMiddleware) ProduceData(data types.OBUData) error {
 			"lat":   data.Lat,
 			"long":  data.Long,
 			"took":  time.Since(start),
-		}).Info("producing to Kafka")
+		}).Info("RECEIVER: producing to Kafka")
 	}(time.Now())
 	return l.next.ProduceData(data)
 }
