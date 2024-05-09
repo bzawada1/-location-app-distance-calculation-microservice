@@ -3,25 +3,31 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/bzawada1/location-app-obu-service/types"
+	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 )
 
 func main() {
-	httpAddr := flag.String("httpAddr", ":4000", "the listen address of the HTTP server")
-	grpcAddr := flag.String("grpcAddr", ":3001", "the listen address of the HTTP server")
+	if err := godotenv.Load(); err != nil {
+		log.Fatal(err)
+	}
 	flag.Parse()
 	store := NewMemoryStore()
 	svc := NewInvoiceAggregator(store)
 	svc = NewLogMiddleware(svc)
 	svc = NewMetricsMiddleware(svc)
-	go makeGRPCTransport(*grpcAddr, svc)
-	makeHTTPTransport(*httpAddr, svc)
+	grpcAddr := os.Getenv("AGG_GRPC_ENDPOINT")
+	httpAddr := os.Getenv("AGG_HTTP_ENDPOINT")
+	go makeGRPCTransport(grpcAddr, svc)
+	makeHTTPTransport(httpAddr, svc)
 }
 
 func makeGRPCTransport(listenAddr string, svc Aggregator) error {
@@ -46,6 +52,9 @@ func makeHTTPTransport(listenAddr string, svc Aggregator) {
 
 func handleGetInvoice(svc Aggregator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "method not supported"})
+		}
 		values, ok := r.URL.Query()["obu"]
 		if !ok {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing OBU ID"})
@@ -75,6 +84,9 @@ func handleGetAllInvoice(svc Aggregator) http.HandlerFunc {
 
 func handleAggregate(svc Aggregator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "method not supported"})
+		}
 		distance := types.Distance{}
 
 		if err := json.NewDecoder(r.Body).Decode(&distance); err != nil {
