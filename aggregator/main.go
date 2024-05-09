@@ -8,18 +8,20 @@ import (
 	"strconv"
 
 	"github.com/bzawada1/location-app-obu-service/types"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 )
 
 func main() {
-	httpAddr := flag.String("httpAddr", ":3000", "the listen address of the HTTP server")
+	httpAddr := flag.String("httpAddr", ":4000", "the listen address of the HTTP server")
 	grpcAddr := flag.String("grpcAddr", ":3001", "the listen address of the HTTP server")
 	flag.Parse()
 	store := NewMemoryStore()
 	svc := NewInvoiceAggregator(store)
-	logSvc := NewLogMiddleware(svc)
+	svc = NewLogMiddleware(svc)
+	svc = NewMetricsMiddleware(svc)
 	go makeGRPCTransport(*grpcAddr, svc)
-	makeHTTPTransport(*httpAddr, logSvc)
+	makeHTTPTransport(*httpAddr, svc)
 }
 
 func makeGRPCTransport(listenAddr string, svc Aggregator) error {
@@ -38,6 +40,7 @@ func makeHTTPTransport(listenAddr string, svc Aggregator) {
 	http.HandleFunc("/aggregate", handleAggregate(svc))
 	http.HandleFunc("/invoice", handleGetInvoice(svc))
 	http.HandleFunc("/invoice/all", handleGetAllInvoice(svc))
+	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(listenAddr, nil)
 }
 
@@ -65,7 +68,7 @@ func handleGetInvoice(svc Aggregator) http.HandlerFunc {
 
 func handleGetAllInvoice(svc Aggregator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, svc.GetAll())
+		writeJSON(w, http.StatusOK, nil)
 		return
 	}
 }

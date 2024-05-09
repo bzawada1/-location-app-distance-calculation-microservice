@@ -17,7 +17,7 @@ type apiFunc func(w http.ResponseWriter, r *http.Request) error
 func main() {
 	listenAddr := flag.String("grpcAddr", ":6000", "the listen address of the HTTP server")
 	flag.Parse()
-	client := client.NewHTTPClient("http://localhost:3000")
+	client := client.NewHTTPClient("http://localhost:4000")
 	invoiceHandler := NewInvoiceHandler(client)
 	http.HandleFunc("/invoice", makeAPIFunc(invoiceHandler.handleGetInvoice))
 	logrus.Infof("gateway HTTP server running on port %s", *listenAddr)

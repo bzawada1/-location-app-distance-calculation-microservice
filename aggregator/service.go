@@ -12,7 +12,7 @@ const basePrice = 0.15
 type Aggregator interface {
 	AggregateDistance(types.Distance) error
 	CalculateInvoice(int) (*types.Invoice, error)
-	GetAll() map[int]float64
+	// GetAll() map[int]float64
 }
 
 type InvoiceAggregator struct {
@@ -25,7 +25,7 @@ type Storer interface {
 	GetAll() map[int]float64
 }
 
-func NewInvoiceAggregator(store Storer) *InvoiceAggregator {
+func NewInvoiceAggregator(store Storer) Aggregator {
 	return &InvoiceAggregator{
 		store: store,
 	}
