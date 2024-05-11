@@ -13,9 +13,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type HTTPFunc func(http.ResponseWriter, *http.Request) error
+
+type APIError struct {
+	Code int
+	Err  error
+}
+
+func (e APIError) Error() string {
+	return e.Err.Error()
+}
+
 type HTTPMetricHandler struct {
 	reqCounter prometheus.Counter
+	errCounter prometheus.Counter
 	reqLatency prometheus.Histogram
+}
+
+func makeHTTPHandlerFunc(fn HTTPFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := fn(w, r); err != nil {
+			if apiErr, ok := err.(APIError); ok {
+				writeJSON(w, apiErr.Code, map[string]string{"error": apiErr.Error()})
+			}
+		}
+	}
 }
 
 func newHTTPMetricsHandler(reqName string) *HTTPMetricHandler {
@@ -23,7 +45,10 @@ func newHTTPMetricsHandler(reqName string) *HTTPMetricHandler {
 		Namespace: fmt.Sprintf("http_%s_%s", reqName, "request_counter"),
 		Name:      "aggregator",
 	})
-
+	errCounter := promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: fmt.Sprintf("http_%s_%s", reqName, "error_counter"),
+		Name:      "aggregator",
+	})
 	reqLatency := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: fmt.Sprintf("http_%s_%s", reqName, "request_latency"),
 		Name:      "aggregator",
@@ -32,72 +57,92 @@ func newHTTPMetricsHandler(reqName string) *HTTPMetricHandler {
 	return &HTTPMetricHandler{
 		reqCounter: reqCounter,
 		reqLatency: reqLatency,
+		errCounter: errCounter,
 	}
 }
 
-func (h *HTTPMetricHandler) instrument(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (h *HTTPMetricHandler) instrument(next HTTPFunc) HTTPFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		var err error
 		defer func(start time.Time) {
 			latency := time.Since(start).Seconds()
-			h.reqLatency.Observe(latency)
 			logrus.WithFields(logrus.Fields{
 				"latency": latency,
 				"request": r.RequestURI,
 			}).Info()
+			h.reqLatency.Observe(latency)
+			h.reqCounter.Inc()
+			if err != nil {
+				h.errCounter.Inc()
+			}
 		}(time.Now())
-
-		h.reqCounter.Inc()
-		next(w, r)
+		err = next(w, r)
+		return err
 	}
 }
 
-func handleGetInvoice(svc Aggregator) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func handleGetInvoice(svc Aggregator) HTTPFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
 		if r.Method != "GET" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "method not supported"})
+			return APIError{
+				Code: http.StatusBadRequest,
+				Err:  fmt.Errorf("method not supported"),
+			}
 		}
 		values, ok := r.URL.Query()["obu"]
 		if !ok {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing OBU ID"})
-			return
+			return APIError{
+				Code: http.StatusBadRequest,
+				Err:  fmt.Errorf("missing OBU ID"),
+			}
 		}
 		obuID, err := strconv.Atoi(values[0])
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid OBU ID"})
-			return
+			return APIError{
+				Code: http.StatusBadRequest,
+				Err:  fmt.Errorf("invalid OBU ID"),
+			}
 		}
 		invoice, err := svc.CalculateInvoice(obuID)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
+			return APIError{
+				Code: http.StatusInternalServerError,
+				Err:  err,
+			}
 		}
-		writeJSON(w, http.StatusOK, invoice)
-		return
+		return writeJSON(w, http.StatusOK, invoice)
 	}
 }
 
-func handleGetAllInvoice(svc Aggregator) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, nil)
-		return
+func handleGetAllInvoice(svc Aggregator) HTTPFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		return writeJSON(w, http.StatusOK, nil)
 	}
 }
 
-func handleAggregate(svc Aggregator) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func handleAggregate(svc Aggregator) HTTPFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
 		if r.Method != "POST" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "method not supported"})
+			return APIError{
+				Code: http.StatusBadRequest,
+				Err:  fmt.Errorf("method not supported"),
+			}
 		}
 		distance := types.Distance{}
 
 		if err := json.NewDecoder(r.Body).Decode(&distance); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-			return
+			return APIError{
+				Code: http.StatusBadRequest,
+				Err:  fmt.Errorf("failed to decode the response body: %s", err),
+			}
 		}
 
 		if err := svc.AggregateDistance(distance); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
+			return APIError{
+				Code: http.StatusInternalServerError,
+				Err:  err,
+			}
 		}
+		return writeJSON(w, http.StatusOK, map[string]string{"message": "ok"})
 	}
 }
