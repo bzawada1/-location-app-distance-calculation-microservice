@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
+	"math/rand"
 	"net/http"
 
 	"github.com/bzawada1/location-app-obu-service/types"
@@ -62,6 +64,7 @@ func (dataReceiver *DataReceiver) wsReceiveLoop() {
 		if err := dataReceiver.conn.ReadJSON(&data); err != nil {
 			log.Printf("read error: ", err)
 		}
+		data.RequestID = rand.Intn(math.MaxInt)
 		fmt.Println("received OBU data: ", data.Long)
 
 		if err := dataReceiver.prod.ProduceData(data); err != nil {
