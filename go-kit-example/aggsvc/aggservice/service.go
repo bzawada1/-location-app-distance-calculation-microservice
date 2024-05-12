@@ -44,12 +44,12 @@ func (s *BasicService) Calculate(_ context.Context, obuID int) (*types.Invoice, 
 	return inv, nil
 }
 
-func NewAggregatorService() Service {
+func New() Service {
 	var svc Service
 	{
 		svc = newBasicService(NewMemoryStore())
-		svc = newLoggingMiddleware()(svc)
-		svc = newInstrumentationMiddleware()(svc)
+		// svc = newLoggingMiddleware()(svc)
+		// svc = newInstrumentationMiddleware()(svc)
 	}
 
 	return svc

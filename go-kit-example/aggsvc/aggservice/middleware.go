@@ -2,7 +2,6 @@ package aggservice
 
 import (
 	"context"
-
 	"github.com/bzawada1/location-app-obu-service/types"
 )
 
