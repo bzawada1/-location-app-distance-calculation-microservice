@@ -2,8 +2,10 @@ package aggservice
 
 import (
 	"context"
+	// "os"
 
 	"github.com/bzawada1/location-app-obu-service/types"
+	"github.com/go-kit/log"
 )
 
 const basePrice = 3.15
@@ -44,12 +46,15 @@ func (s *BasicService) Calculate(_ context.Context, obuID int) (*types.Invoice, 
 	return inv, nil
 }
 
-func New() Service {
+func New(logger log.Logger) Service {
+	// // var logger log.Logger
+	// logger = log.NewLogfmtLogger(os.Stdout)
+	// logger = log.With(logger, "service", "aggregator")
 	var svc Service
 	{
 		svc = newBasicService(NewMemoryStore())
-		// svc = newLoggingMiddleware()(svc)
-		// svc = newInstrumentationMiddleware()(svc)
+		svc = newLoggingMiddleware(logger)(svc)
+		svc = newInstrumentationMiddleware()(svc)
 	}
 
 	return svc

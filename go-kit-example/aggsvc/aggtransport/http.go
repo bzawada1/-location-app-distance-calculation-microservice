@@ -114,12 +114,12 @@ func NewHTTPHandler(endpoints aggendpoint.Set, logger log.Logger) http.Handler {
 		encodeHTTPGenericResponse,
 		options...,
 	))
-	// m.Handle("/invoice", httptransport.NewServer(
-	// 	endpoints.CalculateEndpoint,
-	// 	decodeHTTPCalculateRequest,
-	// 	encodeHTTPGenericResponse,
-	// 	options...,
-	// ))
+	m.Handle("/invoice", httptransport.NewServer(
+		endpoints.CalculateEndpoint,
+		decodeHTTPCalculateRequest,
+		encodeHTTPGenericResponse,
+		options...,
+	))
 	return m
 }
 

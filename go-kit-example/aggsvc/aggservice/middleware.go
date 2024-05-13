@@ -2,6 +2,10 @@ package aggservice
 
 import (
 	"context"
+	"time"
+
+	"github.com/go-kit/log"
+
 	"github.com/bzawada1/location-app-obu-service/types"
 )
 
@@ -9,22 +13,27 @@ type Middleware func(Service) Service
 
 type loggingMiddleware struct {
 	next Service
+	log  log.Logger
 }
 
-func newLoggingMiddleware() Middleware {
+func newLoggingMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return loggingMiddleware{
 			next: next,
+			log:  logger,
 		}
 	}
 }
 
-func (lm loggingMiddleware) Aggregate(_ context.Context, dist types.Distance) error {
-	return nil
+func (lm loggingMiddleware) Aggregate(ctx context.Context, dist types.Distance) (err error) {
+	defer func(start time.Time) {
+		lm.log.Log("took", time.Since(start), "obu", dist.OBUID, "distance", dist.Value, "err", err)
+	}(time.Now())
+	return lm.next.Aggregate(ctx, dist)
 }
 
-func (lm loggingMiddleware) Calculate(_ context.Context, obuID int) (*types.Invoice, error) {
-	return nil, nil
+func (lm loggingMiddleware) Calculate(ctx context.Context, obuID int) (*types.Invoice, error) {
+	return lm.next.Calculate(ctx, obuID)
 }
 
 type instrumentationMiddleware struct {
@@ -39,10 +48,10 @@ func newInstrumentationMiddleware() Middleware {
 	}
 }
 
-func (lm instrumentationMiddleware) Aggregate(_ context.Context, dist types.Distance) error {
-	return nil
+func (im instrumentationMiddleware) Aggregate(ctx context.Context, dist types.Distance) error {
+	return im.next.Aggregate(ctx, dist)
 }
 
-func (lm instrumentationMiddleware) Calculate(_ context.Context, obuID int) (*types.Invoice, error) {
-	return nil, nil
+func (im instrumentationMiddleware) Calculate(ctx context.Context, obuID int) (*types.Invoice, error) {
+	return im.next.Calculate(ctx, obuID)
 }

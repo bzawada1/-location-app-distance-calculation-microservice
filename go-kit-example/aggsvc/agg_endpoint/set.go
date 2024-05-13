@@ -2,15 +2,16 @@ package aggendpoint
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/bzawada1/location-app-obu-service/go-kit-example/aggsvc/aggservice"
 	"github.com/bzawada1/location-app-obu-service/types"
 	"github.com/go-kit/kit/circuitbreaker"
 	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/metrics/prometheus"
 	"github.com/go-kit/kit/ratelimit"
 	"github.com/go-kit/log"
+	stdprometheus "github.com/prometheus/client_golang/prometheus"
 	"github.com/sony/gobreaker"
 	"golang.org/x/time/rate"
 )
@@ -77,7 +78,6 @@ func NewAggregateEndpoint(s aggservice.Service) endpoint.Endpoint {
 
 func NewCalculateEndpoint(s aggservice.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		panic("eeee")
 		req := request.(CalculateRequest)
 		resp, err := s.Calculate(ctx, req.OBUID)
 		return CalculateResponse{
@@ -90,16 +90,12 @@ func NewCalculateEndpoint(s aggservice.Service) endpoint.Endpoint {
 }
 
 func New(svc aggservice.Service, logger log.Logger) Set {
-	var aggregateEndpoint endpoint.Endpoint
-	{
-		aggregateEndpoint = NewAggregateEndpoint(svc)
-		// Sum is limited to 1 request per second with burst of 1 request.
-		// Note, rate is defined as a time interval between requests.
-		aggregateEndpoint = ratelimit.NewErroringLimiter(rate.NewLimiter(rate.Every(time.Second), 1))(aggregateEndpoint)
-		aggregateEndpoint = circuitbreaker.Gobreaker(gobreaker.NewCircuitBreaker(gobreaker.Settings{}))(aggregateEndpoint)
-		// sumEndpoint = LoggingMiddleware(log.With(logger, "method", "Sum"))(sumEndpoint)
-		// sumEndpoint = InstrumentingMiddleware(duration.With("method", "Sum"))(sumEndpoint)
-	}
+	duration := prometheus.NewSummaryFrom(stdprometheus.SummaryOpts{
+		Namespace: "toll_calculator",
+		Subsystem: "aggservice",
+		Name:      "request_duration_seconds",
+		Help:      "Request duration in seconds",
+	}, []string{"method", "success"})
 	var calculateEndpoint endpoint.Endpoint
 	{
 		calculateEndpoint = NewCalculateEndpoint(svc)
@@ -107,10 +103,20 @@ func New(svc aggservice.Service, logger log.Logger) Set {
 		// Note, rate is defined as a number of requests per second.
 		calculateEndpoint = ratelimit.NewErroringLimiter(rate.NewLimiter(rate.Limit(1), 100))(calculateEndpoint)
 		calculateEndpoint = circuitbreaker.Gobreaker(gobreaker.NewCircuitBreaker(gobreaker.Settings{}))(calculateEndpoint)
-
-		// concatEndpoint = LoggingMiddleware(log.With(logger, "method", "Concat"))(concatEndpoint)
-		// concatEndpoint = InstrumentingMiddleware(duration.With("method", "Concat"))(concatEndpoint)
+		calculateEndpoint = LoggingMiddleware(log.With(logger, "method", "Calculate"))(calculateEndpoint)
+		calculateEndpoint = InstrumentationMiddleware(duration.With("method", "Calculate"))(calculateEndpoint)
 	}
+	var aggregateEndpoint endpoint.Endpoint
+	{
+		aggregateEndpoint = NewAggregateEndpoint(svc)
+		// Sum is limited to 1 request per second with burst of 1 request.
+		// Note, rate is defined as a time interval between requests.
+		aggregateEndpoint = ratelimit.NewErroringLimiter(rate.NewLimiter(rate.Every(time.Second), 1))(aggregateEndpoint)
+		aggregateEndpoint = circuitbreaker.Gobreaker(gobreaker.NewCircuitBreaker(gobreaker.Settings{}))(aggregateEndpoint)
+		aggregateEndpoint = LoggingMiddleware(log.With(logger, "method", "Aggregate"))(aggregateEndpoint)
+		aggregateEndpoint = InstrumentationMiddleware(duration.With("method", "Aggregate"))(aggregateEndpoint)
+	}
+
 	return Set{
 		AggregateEndpoint: aggregateEndpoint,
 		CalculateEndpoint: calculateEndpoint,

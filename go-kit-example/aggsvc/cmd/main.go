@@ -14,15 +14,15 @@ import (
 
 func main() {
 	var logger log.Logger
-
-	var (
-		service     = aggservice.New()
-		endpoints   = aggendpoint.New(service, logger)
-		httpHandler = aggtransport.NewHTTPHandler(endpoints, logger)
-	)
 	logger = log.NewLogfmtLogger(os.Stderr)
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
 	logger = log.With(logger, "caller", log.DefaultCaller)
+
+	var (
+		service     = aggservice.New(logger)
+		endpoints   = aggendpoint.New(service, logger)
+		httpHandler = aggtransport.NewHTTPHandler(endpoints, logger)
+	)
 
 	httpAddr := ":5201"
 	httpListener, err := net.Listen("tcp", httpAddr)
